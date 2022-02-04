@@ -52,14 +52,31 @@ camina = function(x0, T0, T1, n = 1) {
   suma_bordes = 0
   for (i in 1:n) {
     pasos = 0
-    while (esta_entre(x0, T0, T1)) {
-      x0 = da_el_paso(x0)
+    x = x0
+    while (esta_entre(x, T0, T1)) {
+      x = da_el_paso(x)
       pasos = pasos + 1
     }
     suma_pasos = suma_pasos + pasos
-    suma_bordes = suma_bordes + (x0 >= T1)
-    print(c(pasos, suma_pasos))
-    print(suma_bordes)
+    suma_bordes = suma_bordes + (x >= T1)
   }
-  return(c(suma_pasos, suma_bordes))
+  return(c(suma_pasos, suma_bordes) / n)
+}
+
+# D
+calcular_recorrido = function(x0, T0, T1) {
+  recorrido = x0
+  while (esta_entre(x0, T0, T1)) {
+    x0 = da_el_paso(x0)
+    recorrido = c(recorrido, x0) # (?) x0 = c(x0, da_el_paso(x0)), esta_entre(x0[length(x0)], ...)
+  }
+  return(recorrido)
+}
+
+# BONUS TRACK !
+plotear_recorrido = function(x0, T0, T1, n=1) {
+  plot(calcular_recorrido(x0, T0, T1), type='l', xlim=c(1,200), ylim=c(-2, 11))
+  for (i in 1:n-1) { # (?) plotea uno de mas porque i in 1:n-1 nunca hace 0 iteraciones
+    lines(calcular_recorrido(x0, T0, T1))
+  }
 }
