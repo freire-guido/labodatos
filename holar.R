@@ -38,4 +38,6 @@ eruptions
 
 ###
 
-coto = read.csv('~/Descargas/datos_coto2016.csv')
+d <- outer(0:9, 0:9)
+fr <- table(outer(d, d, "-"))
+plot(fr, xlab="Determinant", ylab="Frequency")
