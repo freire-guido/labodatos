@@ -24,8 +24,7 @@ rownames(rango_secos) = secos
 precio_carrito = function(nombres, cantidad, datos) {
   precio = 0
   for (i in 1:length(nombres)) {
-    nombre = nombres[i]
-    precio = precio + cuanto_cuesta(nombre, datos)*cantidad
+    precio = precio + cuanto_cuesta(nombres[i], datos)*cantidad[i]
   }
   return(precio)
 }
@@ -35,11 +34,23 @@ cuanto_cuesta = function(nombre, datos) {
 }
 
 elige_productos = function(n, datos) {
-  return(sample(name, n))
+  return(sample(name, n, TRUE))
 }
 
 compra_n = function(n, datos) {
   return(precio_carrito(elige_productos(n, datos), rep(1, n), datos))
 }
 
+# Formato vectorial
 
+precio_carritov = function(nombres, cantidad, datos) {
+  return(cuanto_cuestanv(nombres, datos) %*% cantidad)
+}
+
+cuanto_cuestanv = function(nombres, datos) {
+  return(datos$price[datos$name %in% nombres])
+}
+
+compra_nv = function(n, datos) {
+  return(precio_carritov(elige_productos(n, datos), rep(1, n), datos))
+}
