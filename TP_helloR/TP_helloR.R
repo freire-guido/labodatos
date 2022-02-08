@@ -50,7 +50,7 @@ J_menos_comunes = matriz_jaccard(menos_comunes_anio)
 # Haciendo un analisis parecido al del item C, veo que los coef. Jaccard para los nombres MAS comunes son bastante mas elevados que los de los nombres MENOS comunes.
 
 # E
-frecuencias_nombre = tapply(df_nombres$cantidad, df_nombres$nombre, sum)
+frecuencias_nombre = aggregate(cantidad ~ nombre, data = df_nombres, sum)
 
 ### PARTE 2
 
@@ -86,7 +86,7 @@ camina = function(x0, T0, T1, n = 1) {
 df_caminatas = as.data.frame(camina(0, -1, 10, 1000))
 promedios_borde = tapply(df_caminatas$pasos, df_caminatas$bordes, mean)
 
-# Las caminatas que terminan en el borde mas lejano a x0 tardan, en promedio, casi 5 veces mas que el resto
+# Las caminatas que terminan en el borde mas lejano a x0 tardan, mas veces que el resto
 
 # E
 calcular_recorrido = function(x0, T0, T1) {
