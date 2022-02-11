@@ -58,7 +58,7 @@ frecuencias_nombre = aggregate(cantidad ~ nombre, data = df_nombres, sum)
 da_el_paso = function(x0) {
   return(x0 + runif(length(x0), -1, 1))
 }
-
+  
 # B
 esta_entre = function(x0, T0, T1) {
   return(T0 <= x0 && x0 <= T1)

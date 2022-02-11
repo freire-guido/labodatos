@@ -1,0 +1,14 @@
+---
+title: "TP Estadistica Descriptiva"
+subtitle: Guido Freire
+output:
+  html_document:
+    df_print: paged
+---
+
+Hola
+
+```{r}
+print('hola')
+```
+
