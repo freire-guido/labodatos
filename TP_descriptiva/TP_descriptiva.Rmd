@@ -5,10 +5,111 @@ output:
   html_document:
     df_print: paged
 ---
-
-Hola
+Analisis de avisos de properati en barrios de Buenos Aires
 
 ```{r}
-print('hola')
+ar_properties = read.csv('ar_properties.csv', stringsAsFactors = FALSE)
+head(ar_properties)
 ```
 
+Estaria bueno ver que efectivamente los barrios que tengo que seleccionar existan y que el nombre que uso coincida con el de la base
+
+```{r}
+head(unique(ar_properties$l3))
+```
+
+Hay muchisimos barrios - selecciono los que me interesan
+
+```{r}
+datos_barrios = ar_properties[is.element(ar_properties$l3, c("Boedo", "Colegiales", "Centro / Microcentro", "Mataderos", "Puerto Madero")),]
+table(datos_barrios$l3)
+```
+```{r}
+head(datos_barrios)
+```
+
+Inmediatamente veo filas con NA en "surface_total", "surface_covered" y "rooms", que son los atributos que me interesa analizar a continuacion. Ademas de limpiar eso quito los avisos con precio 0 (sino me rompe las escalas logaritmicas)
+
+```{r}
+datos_barrios = datos_barrios[!is.na(datos_barrios$surface_total) &
+                              !is.na(datos_barrios$surface_covered) &
+                              !is.na(datos_barrios$rooms),]
+```
+
+```{r}
+hist(datos_barrios$surface_total, breaks = 300, xlab = "", main = "Superficie total", xlim = c(0, 1000))
+```
+```{r}
+barplot(sort(table(datos_barrios$rooms), decreasing = TRUE), main = "Ambientes")
+```
+
+Me interesaria comparar estos mismos atributos barrio a barrio
+
+```{r}
+boxplot(rooms ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Ambientes")
+```
+
+Me animo a agrupar a Puerto Madero y Mataderos por un lado, y el resto de los barrios en otro, segun la cantidad de ambientes media
+¿Se repetira esto cuando miro la superficie total por barrio?
+
+```{r}
+boxplot(surface_total ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Superficie total")
+```
+
+Aca no resulta tan obvio el agrupamiento, pero mirando los bigotes de Mataderos y Puerto Madero podria afirmarse que las propiedades 
+tienen superficies mas dispersas. Cuantitativamente:
+
+```{r}
+aggregate(surface_total ~ l3, data = datos_barrios, IQR)
+```
+
+Efectivamente las distancias intercuartiles de Mataderos y Puerto Madero son bastante elevadas en relacion al resto de los barrios. Mido mas magnitudes descriptivas de superficie por barrio:
+
+```{r}
+aggregate(surface_total ~ l3, data = datos_barrios, FUN = function(x) c(promedio = mean(x), mediana = median(x), rango = range(x)))
+```
+
+En congruencia con el analisis anterior, las propiedades tipicas de Boedo, Centro y Colegiales comparten mucho mas que las propiedades tipicas de Mataderos y Puerto Madero.
+Intuitivamente la propiedad tipica de Mataderos deberia ser bastante distinta a la de Puerto Madero. El tamaño promedio de una habitacion podria ser una buena confirmacion de esto.
+
+```{r}
+aggregate(surface_covered / rooms ~ l3, data = datos_barrios, mean)
+```
+
+---
+
+```{r warning=FALSE, figures-side, fig.show="hold", out.width="50%"}
+fondo = datos_barrios$surface_total - datos_barrios$surface_covered
+
+barrios = unique(datos_barrios$l3)
+col_barrios = rainbow(length(barrios))
+names(col_barrios) = barrios
+
+plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Superficie total")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
+plot(surface_covered ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Superficie cubierta")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
+```
+
+```{r warning=FALSE, fig.show="hold", out.width="50%"}
+plot(fondo ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Fondo")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
+plot(surface_covered / rooms ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], ylab = "Habitacion promedio", main = "Habitacion promedio")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
+```
+
+Vale observar que las escalas horizontales y verticales son **logaritmicas**
+Para Puerto Madero hay distintas manchas bien definidas. Los siguientes graficos exploran a que se debe esto.
+
+```{r}
+operaciones = unique(datos_barrios$operation_type)
+col_operaciones = rainbow(length(operaciones))
+names(col_operaciones) = operaciones
+
+datos_puerto = datos_barrios[datos_barrios$l3 == "Puerto Madero",]
+
+plot(surface_total ~ price, data = datos_puerto, log = "xy", col = col_operaciones[datos_puerto$operation_type], main = "Superficie total y precio (Puerto Madero)")
+legend("topleft", legend = operaciones, col = col_operaciones, pch = 1)
+```
+
+Es clarisimo que el manchon "mas caro" de Puerto Madero se atribuye a las propiedades en venta. Aun no tengo claro a que se deben los otros dos.
