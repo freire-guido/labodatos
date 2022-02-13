@@ -36,6 +36,10 @@ datos_barrios = datos_barrios[!is.na(datos_barrios$surface_total) &
                               !is.na(datos_barrios$rooms),]
 ```
 
+\
+
+# Tamaño de las propiedades
+
 ```{r}
 hist(datos_barrios$surface_total, breaks = 300, xlab = "", main = "Superficie total", xlim = c(0, 1000))
 ```
@@ -75,7 +79,10 @@ Intuitivamente la propiedad tipica de Mataderos deberia ser bastante distinta a 
 aggregate(surface_covered / rooms ~ l3, data = datos_barrios, mean)
 ```
 
----
+\
+
+# Relación entre el precio y las características de una propiedad
+
 Intento visualizar los precios de propiedades segun distintos atributos. Construyo una variable "fondo"
 
 ```{r warning=FALSE, figures-side, fig.show="hold", out.width="50%"}
@@ -115,19 +122,46 @@ plot(surface_total ~ price, data = datos_puerto, log = "xy", col = col_operacion
 legend("topleft", legend = operaciones, col = col_operaciones, pch = 1)
 ```
 
-Es clarisimo que el manchon "mas caro" de Puerto Madero se atribuye a las propiedades en venta. Quito las propiedades en alquiler del dataset para visualizar el precio por tipo de propiedad
+Es clarisimo que el manchon "mas caro" de Puerto Madero se atribuye a las propiedades en venta. Quito las propiedades en alquiler del dataset para visualizar el precio por barrio con mayor claridad.
 
 ```{r}
 datos_barrios = datos_barrios[datos_barrios$operation_type == "Venta",]
+plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Superficie total (Venta)")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
+```
 
+Ahora si son mas claras las diferencias de precio barrio a barrio.
+
+```{r}
+boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2)
+```
+
+
+```{r}
 propiedades = unique(datos_barrios$property_type)
 col_propiedades = rainbow(length(propiedades))
 names(col_propiedades) = propiedades
 
-boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2)
+propbarrio = table(datos_barrios$property_type, datos_barrios$l3)
+barplot(t(t(propbarrio) / colSums(propbarrio)), col = col_propiedades, legend.text = TRUE, main = "Composicion de tipos de propiedad") # (?) como ubicar leyenda, arreglar labels que no aparecen
 ```
 
-```{r}
-propbarrio = table(datos_barrios$property_type, datos_barrios$l3)
-barplot(t(t(propbarrio) / colSums(propbarrio)), col = col_propiedades, legend.text = TRUE) # (?) como ubicar leyenda, arreglar labels que no aparecen
+Con esta informacion en mente, estaria bueno comparar lado a lado los graficos de superficie y precio por tipo de propiedad y barrio - dos formas distintas de agrupar la misma correlacion.
+
+```{r fig.show="hold", warning=FALSE, out.width="50%"}
+plot(surface_total ~ price, data = datos_barrios, log="xy", col = col_propiedades[datos_barrios$property_type], main = "Propiedad")
+legend("topleft", legend = propiedades, col = col_propiedades, pch = 1)
+
+plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Barrio")
+legend("topleft", legend = barrios, col = col_barrios, pch = 1)
 ```
+
+El tipo de propiedad ayuda a explicar el precio segun superficie total. Para departamentos la correlacion superficie / precio es particularmente fuerte. Los PH y las casas siguen una tendencia parecida; podria decirse que las casas son como PHs mas caros. Los departamentos suelen ser mas baratos que los PH/casa.
+
+\
+
+# Conclusiones
+
+Los ultimos dos graficos resumen, conjuntamente, una conclusion muy importante; para los mismos atributos, existe mas de una forma de agruparlos en clases bien definidas.
+
+Puede decirse que Puerto Madero tiene las propiedades mas caras como podria decirse que los departamentos son las propiedades mas caras. Podria ser interestante analizar la causalidad de esto. En base al grafico de "Composicion de tipos de propiedad" Puerto Madero podria ser mas caro porque tiene la mayor proporcion de departamentos de todos los barrios. O son mas caros los departamentos porque estan todos en Puerto Madero?
