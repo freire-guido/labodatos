@@ -17,9 +17,6 @@ Estaria bueno ver que efectivamente los barrios que tengo que seleccionar exista
 ```{r}
 head(unique(ar_properties$l3))
 ```
-
-Hay muchisimos barrios - selecciono los que me interesan
-
 ```{r}
 datos_barrios = ar_properties[is.element(ar_properties$l3, c("Boedo", "Colegiales", "Centro / Microcentro", "Mataderos", "Puerto Madero")),]
 table(datos_barrios$l3)
@@ -28,7 +25,7 @@ table(datos_barrios$l3)
 head(datos_barrios)
 ```
 
-Inmediatamente veo filas con NA en "surface_total", "surface_covered" y "rooms", que son los atributos que me interesa analizar a continuacion. Ademas de limpiar eso quito los avisos con precio 0 (sino me rompe las escalas logaritmicas)
+Inmediatamente veo filas con NA en "surface_total", "surface_covered" y "rooms", que son los atributos que me interesa analizar a continuacion (1).
 
 ```{r}
 datos_barrios = datos_barrios[!is.na(datos_barrios$surface_total) &
@@ -47,13 +44,13 @@ hist(datos_barrios$surface_total, breaks = 300, xlab = "", main = "Superficie to
 barplot(sort(table(datos_barrios$rooms), decreasing = TRUE), main = "Ambientes")
 ```
 
-Me interesaria comparar estos mismos atributos barrio a barrio
+Me interesaria comparar estos mismos atributos barrio a barrio (2).
 
 ```{r}
 boxplot(rooms ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Ambientes")
 ```
 
-Me animo a agrupar a Puerto Madero y Mataderos por un lado, y el resto de los barrios en otro, segun la cantidad de ambientes media ¿Se repetira esto cuando miro la superficie total por barrio?
+Me animo a agrupar a Puerto Madero y Mataderos por un lado, y al resto de los barrios por otro, segun la cantidad de ambientes media ¿Se repetira esto cuando miro la superficie total por barri (4)?
 
 ```{r}
 boxplot(surface_total ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Superficie total")
@@ -66,14 +63,14 @@ tienen superficies mas dispersas. Cuantitativamente:
 aggregate(surface_total ~ l3, data = datos_barrios, IQR)
 ```
 
-Efectivamente las distancias intercuartiles de Mataderos y Puerto Madero son bastante elevadas en relacion al resto de los barrios. Mido mas magnitudes descriptivas de superficie por barrio:
+Efectivamente las distancias intercuartiles de Mataderos y Puerto Madero son bastante elevadas en relacion al resto de los barrios. Mido mas magnitudes descriptivas de superficie por barrio (3):
 
 ```{r}
 aggregate(surface_total ~ l3, data = datos_barrios, summary)
 ```
 
 En congruencia con el analisis anterior, las propiedades tipicas de Boedo, Centro y Colegiales comparten mucho mas que las propiedades tipicas de Mataderos y Puerto Madero.
-Intuitivamente la propiedad tipica de Mataderos deberia ser bastante distinta a la de Puerto Madero. El tamaño promedio de una habitacion podria ser una buena confirmacion de esto.
+Intuitivamente la propiedad tipica de Mataderos deberia ser bastante distinta a la de Puerto Madero. El tamaño promedio de una habitacion podria ser una buena confirmacion de esto (5).
 
 ```{r}
 aggregate(surface_covered / rooms ~ l3, data = datos_barrios, mean)
@@ -83,7 +80,7 @@ aggregate(surface_covered / rooms ~ l3, data = datos_barrios, mean)
 
 # Relación entre el precio y las características de una propiedad
 
-Intento visualizar los precios de propiedades segun distintos atributos. Construyo una variable "fondo"
+Intento visualizar los precios de propiedades segun distintos atributos. Construyo una variable "fondo" (1, 2).
 
 ```{r warning=FALSE, figures-side, fig.show="hold", out.width="50%"}
 fondo = datos_barrios$surface_total - datos_barrios$surface_covered
@@ -109,7 +106,7 @@ legend("topleft", legend = barrios, col = col_barrios, pch = 1)
 
 Vale observar que las escalas horizontales y verticales son **logaritmicas**.
 
-Para Puerto Madero hay distintas manchas bien definidas. Los siguientes graficos exploran a que se debe esto.
+Para Puerto Madero hay distintas manchas bien definidas. Los graficos siguientes exploran a que se debe esto.
 
 ```{r warning=FALSE}
 operaciones = unique(datos_barrios$operation_type)
@@ -130,10 +127,10 @@ plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[dato
 legend("topleft", legend = barrios, col = col_barrios, pch = 1)
 ```
 
-Ahora si son mas claras las diferencias de precio barrio a barrio.
+Ahora si son bien claras las diferencias de precio barrio a barrio. Exploro el precio por tipo de propiedad (3)
 
 ```{r}
-boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2)
+boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2, main = "Precio por tipo de propiedad")
 ```
 
 
@@ -146,7 +143,7 @@ propbarrio = table(datos_barrios$property_type, datos_barrios$l3)
 barplot(t(t(propbarrio) / colSums(propbarrio)), col = col_propiedades, legend.text = TRUE, main = "Composicion de tipos de propiedad") # (?) como ubicar leyenda, arreglar labels que no aparecen
 ```
 
-Con esta informacion en mente, estaria bueno comparar lado a lado los graficos de superficie y precio por tipo de propiedad y barrio - dos formas distintas de agrupar la misma correlacion.
+Con esta informacion en mente, estaria bueno comparar lado a lado los graficos de superficie y precio por tipo de propiedad y barrio - dos formas distintas de agrupar la misma correlacion (4).
 
 ```{r fig.show="hold", warning=FALSE, out.width="50%"}
 plot(surface_total ~ price, data = datos_barrios, log="xy", col = col_propiedades[datos_barrios$property_type], main = "Propiedad")
@@ -156,7 +153,9 @@ plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[dato
 legend("topleft", legend = barrios, col = col_barrios, pch = 1)
 ```
 
-El tipo de propiedad ayuda a explicar el precio segun superficie total. Para departamentos la correlacion superficie / precio es particularmente fuerte. Los PH y las casas siguen una tendencia parecida; podria decirse que las casas son como PHs mas caros. Los departamentos suelen ser mas baratos que los PH/casa.
+El tipo de propiedad ayuda a explicar el precio segun superficie total. Para departamentos la correlacion superficie / precio es particularmente fuerte. Los PH y las casas siguen una tendencia parecida; podria decirse que las casas son como PHs mas caros. Los departamentos suelen ser mas caros que los PH/casa.
+
+Estas ideas no eran tan claras con el boxplot de precios por tipo de propiedad porque omite el factor de superficie.
 
 \
 
