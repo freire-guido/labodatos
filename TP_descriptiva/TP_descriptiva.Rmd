@@ -47,13 +47,13 @@ barplot(sort(table(datos_barrios$rooms), decreasing = TRUE), main = "Ambientes")
 Me interesaria comparar estos mismos atributos barrio a barrio (2).
 
 ```{r}
-boxplot(rooms ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Ambientes")
+boxplot(rooms ~ l3, data = datos_barrios, outline = FALSE, ylab = "Ambientes", xlab = "", las = 2)
 ```
 
 Me animo a agrupar a Puerto Madero y Mataderos por un lado, y al resto de los barrios por otro, segun la cantidad de ambientes media ¿Se repetira esto cuando miro la superficie total por barri (4)?
 
 ```{r}
-boxplot(surface_total ~ l3, data = datos_barrios, outline = FALSE, xlab = "Barrio", ylab = "Superficie total")
+boxplot(surface_total ~ l3, data = datos_barrios, outline = FALSE, ylab = "Superficie total", xlab = "", las = 2)
 ```
 
 Aca no resulta tan obvio el agrupamiento, pero mirando los bigotes de Mataderos y Puerto Madero podria afirmarse que las propiedades 
@@ -66,7 +66,7 @@ aggregate(surface_total ~ l3, data = datos_barrios, IQR)
 Efectivamente las distancias intercuartiles de Mataderos y Puerto Madero son bastante elevadas en relacion al resto de los barrios. Mido mas magnitudes descriptivas de superficie por barrio (3):
 
 ```{r}
-aggregate(surface_total ~ l3, data = datos_barrios, summary)
+resumen_barrio = aggregate(surface_total ~ l3, data = datos_barrios, summary, simplify = FALSE)
 ```
 
 En congruencia con el analisis anterior, las propiedades tipicas de Boedo, Centro y Colegiales comparten mucho mas que las propiedades tipicas de Mataderos y Puerto Madero.
@@ -75,6 +75,8 @@ Intuitivamente la propiedad tipica de Mataderos deberia ser bastante distinta a 
 ```{r}
 aggregate(surface_covered / rooms ~ l3, data = datos_barrios, mean)
 ```
+
+La habitacion promedio distingue a Mataderos de Puerto Madero.
 
 \
 
@@ -121,7 +123,7 @@ legend("topleft", legend = operaciones, col = col_operaciones, pch = 1)
 
 Es clarisimo que el manchon "mas caro" de Puerto Madero se atribuye a las propiedades en venta. Quito las propiedades en alquiler del dataset para visualizar el precio por barrio con mayor claridad.
 
-```{r}
+```{r warning=FALSE}
 datos_barrios = datos_barrios[datos_barrios$operation_type == "Venta",]
 plot(surface_total ~ price, data = datos_barrios, log="xy", col=col_barrios[datos_barrios$l3], main = "Superficie total (Venta)")
 legend("topleft", legend = barrios, col = col_barrios, pch = 1)
@@ -130,7 +132,7 @@ legend("topleft", legend = barrios, col = col_barrios, pch = 1)
 Ahora si son bien claras las diferencias de precio barrio a barrio. Exploro el precio por tipo de propiedad (3)
 
 ```{r}
-boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2, main = "Precio por tipo de propiedad")
+boxplot(price ~ property_type, data = datos_barrios, outline = FALSE, las = 2, main = "Precio por tipo de propiedad", xlab = "")
 ```
 
 
@@ -139,8 +141,10 @@ propiedades = unique(datos_barrios$property_type)
 col_propiedades = rainbow(length(propiedades))
 names(col_propiedades) = propiedades
 
+par(mar=c(0,0,0,5) + 3)
 propbarrio = table(datos_barrios$property_type, datos_barrios$l3)
-barplot(t(t(propbarrio) / colSums(propbarrio)), col = col_propiedades, legend.text = TRUE, main = "Composicion de tipos de propiedad") # (?) como ubicar leyenda, arreglar labels que no aparecen
+barplot(t(t(propbarrio) / colSums(propbarrio)), col = col_propiedades, main = "Composicion de tipos de propiedad")
+legend("right", legend = propiedades, col = col_propiedades, pch = 1)
 ```
 
 Con esta informacion en mente, estaria bueno comparar lado a lado los graficos de superficie y precio por tipo de propiedad y barrio - dos formas distintas de agrupar la misma correlacion (4).

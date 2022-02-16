@@ -1,0 +1,44 @@
+---
+title: "Modelado"
+output: html_notebook
+---
+
+# Grid search
+
+```{r}
+perdida_cuad = function(p, y) {
+  return(sum((y - p)**2))
+}
+
+perdida_abs = function(p, y) {
+  return(sum(abs(y - p)))
+}
+```
+
+```{r}
+grid_search = function(y, loss, breaks = 100) {
+  grid = data.frame(val = seq(min(y) - 1, max(y) + 1, length.out = breaks), loss = NA)
+  for (i in 1:breaks) {
+    grid$loss[i] = loss(y, grid$val[i])
+  }
+  return(grid)
+}
+```
+
+```{r}
+v = c(1, 2, 4, 8, 10)
+
+grid_abs = grid_search(v, perdida_abs, 100)
+grid_cuad = grid_search(v, perdida_cuad, 100)
+grid_abs$loss = grid_abs$loss / max(grid_abs$loss)
+grid_cuad$loss = grid_cuad$loss / max(grid_cuad$loss)
+
+plot(loss ~ val, data = grid_cuad, col = "blue")
+points(loss ~ val, data = grid_abs, pch = 1, col = "red")
+
+abline(v = grid_cuad$val[which.min(grid_cuad$loss)], col = "blue")
+abline(v = grid_abs$val[which.min(grid_abs$loss)], col = "red")
+
+legend("bottomright", legend = c("abs", "cuad"), col = c("red", "blue"), pch = 1)
+```
+
