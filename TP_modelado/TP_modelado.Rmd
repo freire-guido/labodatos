@@ -1,0 +1,118 @@
+---
+title: "TP Modelado Lineal"
+subtitle: Guido Freire
+output:
+  html_document:
+    df_print: paged
+---
+
+Limpio un poco los datos y analizo la distribucion en el tiempo porque me interesa trabajar con la temporalidad.
+
+```{r}
+datos = read.csv("datos_alquiler.csv")
+datos$start_date = as.Date(datos$start_date)
+head(datos)
+```
+
+```{r}
+(max(datos$start_date) - min(datos$start_date)) - length(unique(datos$start_date))
+```
+
+
+Hay 5 dias donde no se hicieron avisos para el periodo de tiempo del dataset. Esto puede influenciar el promedio de avisos por dia pero decido ignorarlo y hacer de cuenta que hay avisos para todas las fechas (las sumas por dia de la semana se mantienen iguales).
+
+```{r}
+barplot(table(datos$start_date))
+```
+
+Visualmente no parece muy descabellada la distribucion de cantidad de avisos vs. tiempo. Me interesa cuantificar esto:
+
+```{r, figures-side, fig.show='hold', out.width='50%'}
+summary(as.numeric(table(datos$start_date)))
+
+dia_semana = ordered(weekdays(datos$start_date), levels = c("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"))
+barplot(table(dia_semana))
+
+dia_mes = ordered(months(datos$start_date), levels = c("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"))
+barplot(table(dia_mes))
+```
+
+El dia de la semana donde mas avisos se publican es el Viernes, habria esperado que los fines de semana sean mas populares de lo que son. Hay meses sin avisos porque el dataset cubre el periodo Diciembre 2018 - Junio 2019. (1)
+
+```{r}
+mod_cte = lm(price ~ 1, data = datos)
+plot(datos$price, ylab = "price")
+abline(mod_cte, col = "red")
+abline(h = mean(datos$price), col = "blue", lty = "dotted", lwd = 2)
+legend("topright", legend = c("modelo constante", "media"), col = c("red", "blue"), lty = c("solid", "dotted"))
+```
+
+El modelo lineal de un parametro constante es igual a la media. (2)
+
+```{r fig.show='hold', warning=FALSE, out.width="50%"}
+plot(price ~ fondo, data = datos)
+plot(price ~ surface_covered, data = datos)
+```
+
+El precio aumenta con el fondo y la superficie cubierta. Visualmente, los datos son menos dispersos cerca de la recta de superficie cubierta
+
+```{r}
+plot(price ~ start_date, data = datos)
+```
+
+La relacion entre precio y fecha de publicacion no resulta tan evidente como las dos anteriores. (3)
+
+```{r}
+mod_sup = lm(price ~ surface_covered, data = datos)
+
+plot(price ~ surface_covered, data = datos)
+abline(mod_sup, col = "red")
+legend("topright", legend = "modelo superficie", col = "red", lty = "solid")
+```
+
+Construí un modelo lineal que relaciona superficie cubierta con precio. A primera vista parece que ajusta bastante bien, pero me interesa cuantificar que tan bien lo hace. (4)
+
+```{r}
+mean(abs(mod_sup$residuals)) # MAE
+summary(mod_sup)$r.squared
+```
+
+El error medio para el modelo de precio es de $3100. El modelo tiene un R² de 0,608 asi que conserva poco mas del 60% de la varianza.
+Otra cosa que noto es que el modelo se desempeña mejor en las superficies cubiertas menores a 100 (que corresponde a precios menores de $30000). Analizo los residuales en funcion de superficie cubierta:
+
+```{r}
+plot(mod_sup$residuals ~ datos$surface_covered, ylab = "residuals", xlab = "surface_covered")
+abline(h = 0)
+```
+
+Efectivamente los residuos se alejan de 0 cuando aumenta la superficie cubierta, como se intuyo en el grafico anterior.
+
+```{r}
+datos$dias = as.numeric(datos$start_date - min(datos$start_date))
+mod_tmp = lm(price ~ dias, data = datos)
+
+plot(price ~ dias, data = datos)
+abline(mod_tmp, col = "blue")
+```
+
+La pendiente del modelo precio - fecha representa la inflacion del precio de las propiedades del dataset pero no es tan clara en el grafico. La mido:
+
+```{r}
+mod_tmp$coefficients # (?) como interpreto la pendiente? Claramente no se triplican los precios de un dia al otro
+```
+
+```{r}
+mod_tip = lm(price ~ property_type, data = datos)
+boxplot(price ~ property_type, data = datos, outline = FALSE)
+points(x = 1:3, y = predict(mod_tip, newdata = data.frame(property_type = c("Casa", "Departamento", "PH"))), pch = 18)
+```
+
+falta texto
+
+```{r}
+mod_pos = lm(price ~ lat + lon, data = datos)
+
+datos$pred = (mod_pos$fitted.values - min(mod_pos$fitted.values)) / (max(mod_pos$fitted.values) - min(mod_pos$fitted.values))
+plot(lat ~ lon, data = datos, col = rgb(pred, 0, 1 - pred))
+# legend("topright", legend = sort(mod_pos$fitted.values), col = col_pos)
+```
