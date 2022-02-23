@@ -4,6 +4,8 @@ subtitle: Guido Freire
 output:
   html_document:
     df_print: paged
+  html_notebook:
+    df_print: paged
 ---
 
 Limpio un poco los datos y analizo la distribucion en el tiempo porque me interesa trabajar con la temporalidad.
@@ -27,8 +29,10 @@ barplot(table(datos$start_date))
 
 Visualmente no parece muy descabellada la distribucion de cantidad de avisos vs. tiempo. Me interesa cuantificar esto:
 
-```{r, figures-side, fig.show='hold', out.width='50%'}
+```{r}
 summary(as.numeric(table(datos$start_date)))
+
+par(mfrow = c(1,2))
 
 dia_semana = ordered(weekdays(datos$start_date), levels = c("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"))
 barplot(table(dia_semana))
@@ -49,7 +53,8 @@ legend("topright", legend = c("modelo constante", "media"), col = c("red", "blue
 
 El modelo lineal de un parametro constante es igual a la media. (2)
 
-```{r fig.show='hold', warning=FALSE, out.width="50%"}
+```{r}
+par(mfrow = c(1,2))
 plot(price ~ fondo, data = datos)
 plot(price ~ surface_covered, data = datos)
 ```
@@ -101,18 +106,52 @@ La pendiente del modelo precio - fecha representa la inflacion del precio de las
 mod_tmp$coefficients # (?) como interpreto la pendiente? Claramente no se triplican los precios de un dia al otro
 ```
 
+Esto puede interpretarse como una inflacion de $3 por dia. 
+
 ```{r}
 mod_tip = lm(price ~ property_type, data = datos)
 boxplot(price ~ property_type, data = datos, outline = FALSE)
-points(x = 1:3, y = predict(mod_tip, newdata = data.frame(property_type = c("Casa", "Departamento", "PH"))), pch = 18)
+points(x = 1:3, y = predict(mod_tip, newdata = data.frame(property_type = c("Casa", "Departamento", "PH"))), pch = 18, col = "red")
+points(x = 1:3, y = aggregate(price ~ property_type, data = datos, mean)$price, pch = 1, col = "blue")
 ```
 
-falta texto
+Arriba se visualiza un modelo con tipo de propiedad como unico parametro. Cada uno de los puntos rojos corresponde a la prediccion del modelo - que es identica al precio promedio por cada categoria (circulos azules) (6).
+
+Construyo un modelo que utiliza los atributos de latitud y longitud.
 
 ```{r}
+normalizar = function(vec){
+  return((vec - min(vec)) / (max(vec) - min(vec)))
+}
+
 mod_pos = lm(price ~ lat + lon, data = datos)
 
-datos$pred = (mod_pos$fitted.values - min(mod_pos$fitted.values)) / (max(mod_pos$fitted.values) - min(mod_pos$fitted.values))
+datos$pred = normalizar(mod_pos$fitted.values)
 plot(lat ~ lon, data = datos, col = rgb(pred, 0, 1 - pred))
-# legend("topright", legend = sort(mod_pos$fitted.values), col = col_pos)
+legend("topright", legend = c("mas caro", "menos caro"), col = c("red", "blue"), pch = 1)
 ```
+
+Se aprecia el plano que construye el modelo (linear) para predecir el precio como un degrade de suroeste a noreste. Le sumo superficie total al modelo:
+
+```{r}
+mod_tri = lm(price ~ lat + lon + surface_total, data = datos)
+
+datos$pred = normalizar(mod_tri$fitted.values)
+plot(lat ~ lon, data = datos, col = rgb(pred, 0, 1 - pred))
+legend("topright", legend = c("mas caro", "menos caro"), col = c("red", "blue"), pch = 1)
+```
+
+```{r}
+mean(abs(mod_pos$residuals))
+summary(mod_pos)$r.squared
+```
+
+El modelo de ubicacion (latitud y longitud) es malisimo. El MAE es mayor a $5000 y el R^2 es menor a 0.1 - el modelo univariado de superficie total tiene 10x mejor R^2 y toma la mitad de los parametros.
+
+```{r}
+mean(abs(mod_tri$residuals))
+summary(mod_tri)$r.squared
+```
+
+El modelo de ubicacion y superficie total repunta bastante. El MAE es casi la mitad del anterior pero el R^2 es marginalmente mejor al de superficie total unicamente. Sin embargo, toma tres variables.
+
