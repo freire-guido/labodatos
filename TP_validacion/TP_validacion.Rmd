@@ -1,0 +1,121 @@
+---
+title: "TP Validacion"
+subtitle: Guido Freire
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+datos = read.csv("datos_alquiler_crossvalidation.csv", stringsAsFactors = FALSE)
+head(datos)
+```
+Defino las funciones de validacion (1, 2)
+
+```{r}
+MAE = function(x, y) {
+  return(sum(abs(x - y)) / length(x))
+}
+
+PMAE = function(x, y) {
+  return(sum(abs(x - y)) / sum(x))
+}
+```
+
+Creo modelos de uno y dos parametros y comparo en base a mis dos funciones anteriores (3)
+
+```{r}
+mod_sup = lm(price ~ surface_covered, data = datos)
+mod_amb = lm(price ~ surface_covered + fondo, data = datos)
+
+sapply(list(sup = mod_sup$fitted.values, fondo = mod_amb$fitted.values),
+       function(x) list(MAE = MAE(x, datos$price), PMAE = PMAE(x, datos$price)))
+```
+
+Considero que no vale la pena duplicar la cantidad de parametros por una mejora tan pequeña. Sigo al punto (4)
+
+```{r}
+crossval = function(datos, formu, n_obs, fun_error, n_muestras = 1) {
+  errores = NULL
+  for (i in 1:n_muestras) {
+    samp_ev = sample(1:nrow(datos), n_obs)
+    modelo = lm(formu, data = datos[-samp_ev,])
+    error = fun_error(predict(modelo, datos[samp_ev,]), datos$price[samp_ev])
+    errores = c(errores, error)
+  }
+  return(list(errores = errores, promedio = mean(errores), varianza = var(errores), formula = formu, modelo = lm(formu, data = datos)))
+}
+```
+
+Exploro el error del modelo linear en funcion de la cantidad de observaciones de evaluacion (6)
+
+```{r}
+errores = NULL
+observaciones = seq(1,100,5)
+for (n_obs in observaciones) {
+  errores = c(errores, crossval(datos, price ~ surface_covered, n_obs, PMAE, 100)$promedio)
+}
+plot(observaciones, errores)
+```
+
+El error del modelo aumenta con la cantidad de observaciones para evaluar, porque se esta entrenando con menos datos.
+
+```{r}
+errores = NULL
+K = 8
+for (k in 1:K) {
+  validacion = crossval(datos, price ~ poly(fondo, k), 20, PMAE, 20)
+  errores = rbind(errores, list(err_pred = validacion$promedio,
+                                err_ajus = PMAE(predict(validacion$modelo), datos$price)))
+}
+plot(1:K, errores[,"err_pred"], col = "green", xlab = "grado", ylab = "PMAE")
+points(1:K, errores[,"err_ajus"], col = "blue")
+legend("topright", c("prediccion", "ajuste"), col = c("green", "blue"), pch = 1)
+```
+
+El PMAE de ajuste disminuye ligeramente con el grado, atribuyo esto al overfitting. El error de prediccion tiende a aumentar (con bastante ruido) - la relacion subyacente entre las variables no es de grado elevado, pero tampoco es totalmente lineal (7). Para completar el punto (8) hago crossval de mis 3 modelos usando PMAE.
+
+```{r}
+val_sup = crossval(datos, price ~ surface_covered, 20, PMAE, 100)
+val_fon = crossval(datos, price ~ fondo, 20, PMAE, 100)
+val_amb = crossval(datos, price ~ surface_covered + fondo, 20, PMAE, 100)
+
+sapply(list(superficie = val_sup, fondo = val_fon, ambas = val_amb),
+       function(x) list(prediccion = x$promedio, ajuste = PMAE(x$modelo$fitted.values, datos$price)))
+```
+
+En terminos de las metricas anteriores, es claro que el mejor modelo es el que toma superficie y fondo. Sin embargo, no parece rentable duplicar la cantidad de parametros para una mejora tan marginal en las capacidades predictivas del modelo. Las distancias entre los PMAE de prediccion y de ajustes no es tan elevado, por lo que no se comete overfitting (es un modelo lineal asi que tiene bastante sentido).
+
+Repito el procedimiento anterior con modelos de grado 8 para comprobar que efectivamente aumenta la distancia prediccion - ajuste por overfitting.
+
+```{r}
+val_sup8 = crossval(datos, price ~ poly(surface_covered, 8), 20, PMAE, 100)
+val_fon8 = crossval(datos, price ~ poly(fondo, 8), 20, PMAE, 100)
+val_amb8 = crossval(datos, price ~ poly(surface_covered, 8) + fondo, 20, PMAE, 100)
+
+sapply(list(superficie = val_sup8, fondo = val_fon8, ambas = val_amb8),
+       function(x) list(prediccion = x$promedio, ajuste = PMAE(x$modelo$fitted.values, datos$price)))
+```
+
+Efectivamente overfitting implica mayor distancia entre prediccion y ajuste.
+
+```{r}
+errores = NULL
+variables = c("surface_covered", "fondo", "lat + lon")
+for (m in 1:(length(variables))) {
+  combinaciones = combn(variables, m)
+  for (i in 1:ncol(combinaciones)) {
+    val = crossval(datos, as.formula(paste("price ~ ", paste(combinaciones[,i], collapse = " + "))), 20, PMAE, 20)
+    errores = rbind(errores, data.frame(combinacion = paste("price ~ ", paste(combinaciones[,i], collapse = " + ")),
+                                  err_pred = val$promedio,
+                                  err_ajus = PMAE(predict(val$modelo), datos$price)))
+  }
+}
+
+plot.default(errores$combinacion, errores$err_pred, axes = FALSE, ylim = c(0, 0.5), col = "green")
+axis(side = 1, at = as.numeric(errores$combinacion), labels = errores$combinacion, las = 2)
+axis(side=2, at=seq(0, 0.5, 0.1), labels = seq(0, 0.5, 0.1))
+points(errores$combinacion, errores$err_ajus, col = "blue")
+legend("topright", c("prediccion", "ajuste"), col = c("green", "blue"), pch = 1)
+```
+
