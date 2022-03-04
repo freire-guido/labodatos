@@ -6,6 +6,8 @@ output:
     df_print: paged
 ---
 
+Importo y chusmeo el dataset antes de empezar a modelar y validar.
+
 ```{r}
 datos = read.csv("datos_alquiler_crossvalidation.csv", stringsAsFactors = FALSE)
 head(datos)
@@ -29,7 +31,7 @@ mod_sup = lm(price ~ surface_covered, data = datos)
 mod_amb = lm(price ~ surface_covered + fondo, data = datos)
 
 sapply(list(sup = mod_sup$fitted.values, fondo = mod_amb$fitted.values),
-       function(x) list(MAE = MAE(x, datos$price), PMAE = PMAE(x, datos$price)))
+       function(x) list(MAE = MAE(datos$price, x), PMAE = PMAE(datos$price, x)))
 ```
 
 Considero que no vale la pena duplicar la cantidad de parametros por una mejora tan pequeña. Sigo al punto (4)
@@ -55,7 +57,7 @@ observaciones = seq(1,100,5)
 for (n_obs in observaciones) {
   errores = c(errores, crossval(datos, price ~ surface_covered, n_obs, PMAE, 100)$promedio)
 }
-plot(observaciones, errores)
+plot(observaciones, errores, main = "Modelo superficie cubierta (linear)")
 ```
 
 El error del modelo aumenta con la cantidad de observaciones para evaluar, porque se esta entrenando con menos datos.
@@ -66,9 +68,9 @@ K = 8
 for (k in 1:K) {
   validacion = crossval(datos, price ~ poly(fondo, k), 20, PMAE, 20)
   errores = rbind(errores, list(err_pred = validacion$promedio,
-                                err_ajus = PMAE(predict(validacion$modelo), datos$price)))
+                                err_ajus = PMAE(datos$price, predict(validacion$modelo))))
 }
-plot(1:K, errores[,"err_pred"], col = "green", xlab = "grado", ylab = "PMAE")
+plot(1:K, errores[,"err_pred"], col = "green", xlab = "grado", ylab = "PMAE", main = "Modelo superficie cubierta (polinomico)")
 points(1:K, errores[,"err_ajus"], col = "blue")
 legend("topright", c("prediccion", "ajuste"), col = c("green", "blue"), pch = 1)
 ```
@@ -81,7 +83,7 @@ val_fon = crossval(datos, price ~ fondo, 20, PMAE, 100)
 val_amb = crossval(datos, price ~ surface_covered + fondo, 20, PMAE, 100)
 
 sapply(list(superficie = val_sup, fondo = val_fon, ambas = val_amb),
-       function(x) list(prediccion = x$promedio, ajuste = PMAE(x$modelo$fitted.values, datos$price)))
+       function(x) list(prediccion = x$promedio, ajuste = PMAE(datos$price, x$modelo$fitted.values)))
 ```
 
 En terminos de las metricas anteriores, es claro que el mejor modelo es el que toma superficie y fondo. Sin embargo, no parece rentable duplicar la cantidad de parametros para una mejora tan marginal en las capacidades predictivas del modelo. Las distancias entre los PMAE de prediccion y de ajustes no es tan elevado, por lo que no se comete overfitting (es un modelo lineal asi que tiene bastante sentido).
@@ -94,10 +96,26 @@ val_fon8 = crossval(datos, price ~ poly(fondo, 8), 20, PMAE, 100)
 val_amb8 = crossval(datos, price ~ poly(surface_covered, 8) + fondo, 20, PMAE, 100)
 
 sapply(list(superficie = val_sup8, fondo = val_fon8, ambas = val_amb8),
-       function(x) list(prediccion = x$promedio, ajuste = PMAE(x$modelo$fitted.values, datos$price)))
+       function(x) list(prediccion = x$promedio, ajuste = PMAE(datos$price, x$modelo$fitted.values)))
 ```
 
 Efectivamente overfitting implica mayor distancia entre prediccion y ajuste.
+
+```{r}
+crossval = function(datos, formu, n_obs, fun_error, n_muestras = 1) {
+  errores = NULL
+  for (i in 1:n_muestras) {
+    samp_ev = sample(1:nrow(datos), n_obs)
+    modelo = lm(formu, data = datos[-samp_ev,])
+    error = fun_error(predict(modelo, datos[samp_ev,]), datos$price[samp_ev])
+    errores = c(errores, error)
+  }
+  return(list(errores = errores, promedio = mean(errores), varianza = var(errores), formula = formu, modelo = lm(formu, data = datos)))
+}
+```
+
+En este caso omito los modelos que toman property_type como parametro. Para PH y Casa existen muy pocas observaciones y tendria poco sentido entrenar un modelo con ellas.
+Ademas, al realizar el sampling para train y test muchas veces se entrena un modelo solo en el tipo de propiedad departamento.
 
 ```{r}
 errores = NULL
@@ -105,17 +123,23 @@ variables = c("surface_covered", "fondo", "lat + lon")
 for (m in 1:(length(variables))) {
   combinaciones = combn(variables, m)
   for (i in 1:ncol(combinaciones)) {
-    val = crossval(datos, as.formula(paste("price ~ ", paste(combinaciones[,i], collapse = " + "))), 20, PMAE, 20)
-    errores = rbind(errores, data.frame(combinacion = paste("price ~ ", paste(combinaciones[,i], collapse = " + ")),
+    val = crossval(datos, as.formula(paste("price ~ ", paste(combinaciones[,i], collapse = " + "))), 20, PMAE, 100)
+    errores = rbind(errores, data.frame(combinacion = paste(combinaciones[,i], collapse = " + "),
                                   err_pred = val$promedio,
-                                  err_ajus = PMAE(predict(val$modelo), datos$price)))
+                                  err_ajus = PMAE(datos$price, predict(val$modelo))))
   }
 }
 
-plot.default(errores$combinacion, errores$err_pred, axes = FALSE, ylim = c(0, 0.5), col = "green")
-axis(side = 1, at = as.numeric(errores$combinacion), labels = errores$combinacion, las = 2)
+errores$combinacion = as.factor(errores$combinacion)
+par(mar = c(5,0,0,0) + 5)
+
+plot.default(errores$combinacion, errores$err_pred, axes = FALSE, ylim = c(0, 0.5), col = "green", xlab = "", ylab = "PMAE", main = "Errores por formula (linear)")
+axis(side = 1, at = 1:length(errores$combinacion), labels = errores$combinacion, las = 2)
 axis(side=2, at=seq(0, 0.5, 0.1), labels = seq(0, 0.5, 0.1))
 points(errores$combinacion, errores$err_ajus, col = "blue")
 legend("topright", c("prediccion", "ajuste"), col = c("green", "blue"), pch = 1)
 ```
 
+El PMAE demuestra que los mejores modelos son los que toman superficie cubierta como parametro. La formula price ~ surface_covered parece la mas apropiada, sumar cualquier otro parametro no produce un incremento tan grande en la capacidad predictiva del modelo. Tener un unico parametro tambien resulta muy economico.
+
+Quizas en modelos no lineares si convendria meter mas parametros en la mezcla, pero por ahora no veo por que.
