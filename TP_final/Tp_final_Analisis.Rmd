@@ -1,0 +1,81 @@
+---
+title: "TP Final Laboratorio de Datos"
+subtitle: poner nombres
+output:
+  html_document:
+    df_print: paged
+---
+
+# Analisis exploratorio (EDA)
+
+Veamos y estudiemos un poco la información que tenemos.
+
+```{r}
+datos <- read.csv('chicos.csv')
+algunas_filas <- sample(1:nrow(datos), 10)
+datos[algunas_filas,]
+```
+
+Se observa que las unidades del dataset no son las mas intuitivas. Convertimos las medidas a explorar a formatos mas amigables: WEIGHT (kg), AGE (y), STATURE (m).
+
+```{r}
+datos_obligatorios = datos[, c("WEIGHT", "STATURE", "SEX", "RACE", "AGE.IN.MONTHS")]
+datos_obligatorios$WEIGHT = datos_obligatorios$WEIGHT / 10
+datos_obligatorios$AGE = datos_obligatorios$AGE.IN.MONTHS / 12
+datos_obligatorios$STATURE = datos_obligatorios$STATURE / 1000
+
+head(datos_obligatorios)
+```
+
+Hay varios datos erroneos, particularmente 0s. Los pasamos a NA (mas r friendly)
+
+```{r}
+datos_obligatorios = datos_obligatorios[!(datos_obligatorios$AGE.IN.MONTHS == 0),]
+
+datos_obligatorios[datos_obligatorios$WEIGHT == 0, "WEIGHT"] <- NA
+datos_obligatorios[datos_obligatorios$STATURE ==0, "STATURE"] <- NA
+datos_obligatorios[datos_obligatorios$RACE ==0, "RACE"] <- NA
+
+datos_obligatorios$SEX = factor(datos_obligatorios$SEX, labels = c("masculino", "femenino"))
+datos_obligatorios$RACE = factor(datos_obligatorios$RACE, labels = c("white", "black", "oriental", "am. indian", "mixed"))
+```
+
+La unica excepcion es AGE.IN.MONTHS, que si bien puede ser 0 se intuye que esta mal al haber solo dos apariciones con valores que no corresponden (demasiado pesados o demasiado altos).
+
+```{r}
+layout(t(c(1,2,2)))
+
+boxplot(STATURE ~ SEX, data = datos_obligatorios, ylim = c(0.8, 2))
+
+boxplot(STATURE ~ RACE, data = datos_obligatorios, ylim = c(0.8, 2))
+text(1:length(levels(datos_obligatorios$RACE)), 2, paste("n =", table(datos_obligatorios$RACE)))
+```
+
+
+```{r}
+normalizar = function(vec){
+  return((vec - min(vec)) / (max(vec) - min(vec)))
+}
+
+masomenos = function(x, y, tol) {
+  return(y <= x + tol & y >= x - tol)
+}
+
+STATURE_norm = normalizar(datos_obligatorios[!is.na(datos_obligatorios$STATURE), "STATURE"])
+AGE_norm = normalizar(datos_obligatorios[datos_obligatorios$AGE, "AGE"])
+
+plot(WEIGHT ~ AGE, datos_obligatorios, col = rgb(STATURE_norm, 0, 1 - STATURE_norm), pch = 4, xlab = "AGE (y)", ylab = "WEIGHT (kg)")
+legend("topleft", legend = c("mas alto", "menos alto"), col = c("red", "blue"), pch = 4)
+
+plot(WEIGHT ~ STATURE, datos_obligatorios,
+     col = ifelse(masomenos(datos_obligatorios$AGE, median(datos_obligatorios$AGE), 0.5), "green", rgb(AGE_norm, 0, 1 - AGE_norm)),
+     pch = 4, xlab = "STATURE (m)", ylab = "WEIGHT (kg)")
+legend("topleft", legend = c("mas edad", "menos edad"), col = c("red", "blue"), pch = 4)
+```
+
+esto para mostrar funciones de R base piolas
+
+```{r}
+coplot(STATURE ~ AGE | RACE + SEX, datos_obligatorios, rows = 1)
+```
+

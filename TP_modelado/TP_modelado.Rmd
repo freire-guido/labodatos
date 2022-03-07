@@ -127,7 +127,7 @@ normalizar = function(vec){
 mod_pos = lm(price ~ lat + lon, data = datos)
 
 datos$pred = normalizar(mod_pos$fitted.values)
-plot(lat ~ lon, data = datos, col = rgb(pred, 0, 1 - pred))
+plot(lat ~ lon, data = datos, col = rgb(pred, 0, 1 - pred), main = "Precio predicho (lat + lon)")
 legend("topright", legend = c("mas caro", "menos caro"), col = c("red", "blue"), pch = 1)
 ```
 
