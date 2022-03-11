@@ -1,5 +1,5 @@
 ---
-title: "TP Final Laboratorio de Datos"
+title: 'TP Final Laboratorio de Datos'
 subtitle: poner nombres
 output:
   html_document:
@@ -16,41 +16,76 @@ algunas_filas <- sample(1:nrow(datos), 10)
 datos[algunas_filas,]
 ```
 
-Se observa que las unidades del dataset no son las mas intuitivas. Convertimos las medidas a explorar a formatos mas amigables: WEIGHT (kg), AGE (y), STATURE (m).
+Se observa que las unidades del dataset no son las mas intuitivas. Convertimos las medidas a explorar a formatos mas amigables: WEIGHT (kg), AGE (y) y medidas (cm).
 
 ```{r}
-datos_obligatorios = datos[, c("WEIGHT", "STATURE", "SEX", "RACE", "AGE.IN.MONTHS")]
-datos_obligatorios$WEIGHT = datos_obligatorios$WEIGHT / 10
-datos_obligatorios$AGE = datos_obligatorios$AGE.IN.MONTHS / 12
-datos_obligatorios$STATURE = datos_obligatorios$STATURE / 1000
+obligatorios <- c('WEIGHT', 'STATURE', 'SEX', 'RACE', 'AGE.IN.MONTHS')
+escogidos <- c('WAIST.CIRCUMFERENCE', 'SHOULDER.ELBOW.LENGTH', 'ELBOW.HAND.LENGTH', 'FOOT.LENGTH', 'FOOT.BREADTH')
 
-head(datos_obligatorios)
+datos_usados <- datos[, c(obligatorios, escogidos)]
+
+datos_usados$WEIGHT = datos_usados$WEIGHT / 10
+datos_usados$AGE = datos_usados$AGE.IN.MONTHS / 12
+datos_usados$STATURE = datos_usados$STATURE / 10
+View(datos_usados)
+head(datos_usados)
 ```
-
-Hay varios datos erroneos, particularmente 0s. Los pasamos a NA (mas r friendly)
+Convertimos las unidades de todas las variables a cm (esta en mm). Convertimos los 0 a NA.
 
 ```{r}
-datos_obligatorios = datos_obligatorios[!(datos_obligatorios$AGE.IN.MONTHS == 0),]
+datos_usados[, escogidos] <- datos_usados[, escogidos] / 10
+for (col in colnames(datos_usados)) {
+  datos_usados[datos_usados[, col] == 0, col] <- NA
+}
 
-datos_obligatorios[datos_obligatorios$WEIGHT == 0, "WEIGHT"] <- NA
-datos_obligatorios[datos_obligatorios$STATURE ==0, "STATURE"] <- NA
-datos_obligatorios[datos_obligatorios$RACE ==0, "RACE"] <- NA
-
-datos_obligatorios$SEX = factor(datos_obligatorios$SEX, labels = c("masculino", "femenino"))
-datos_obligatorios$RACE = factor(datos_obligatorios$RACE, labels = c("white", "black", "oriental", "am. indian", "mixed"))
+datos_usados <- datos_usados[!is.na(datos_usados$AGE),]
 ```
 
-La unica excepcion es AGE.IN.MONTHS, que si bien puede ser 0 se intuye que esta mal al haber solo dos apariciones con valores que no corresponden (demasiado pesados o demasiado altos).
+```{r}
+summary(datos_usados[,escogidos])
+
+boxplot(datos_usados[,escogidos], las = 2, outline = FALSE)
+```
+Los valores son coherentes. Veamos cuantos faltantes hay:
+
+```{r}
+apply(datos_usados[,escogidos], 2, function(x) sum(is.na(x)))
+```
+
+---
+
+Hay varios datos erroneos, particularmente 0s. Los pasamos a NA (mas r friendly). Ademas, para no tener que recordar qué significa cada uno de los números que se encuentra en las columnas SEX y RACE, decimos reemplazar cada uno por la calificación que le corresponde.
+
+Hay varios datos erroneos, particularmente 0s. Los pasamos a NA (mas r friendly). Además, para no tener que recordar que significa cada uno de los números que se encuentra en las columnas SEX y RACE, decimos reemplazar cada uno por la calificación que le corresponde.
+
+
+```{r}
+datos_usados$SEX = factor(datos_usados$SEX, labels = c('masculino', 'femenino'))
+datos_usados$RACE = factor(datos_usados$RACE, labels = c('white', 'black', 'oriental', 'am. indian', 'mixed'))
+```
+
+La unica excepción es AGE.IN.MONTHS, que si bien puede ser 0 se intuye que esta mal al haber solo dos apariciones con valores que no corresponden (demasiado pesados o demasiado altos).
+
+
+Estudiemos un poco la variable de estatura, cómo cambia en relación al sexo y la raza.
+
+Estudiemos un poco la variable de estatura, cómo cambia en relación al sexo y la raza.
+
 
 ```{r}
 layout(t(c(1,2,2)))
 
-boxplot(STATURE ~ SEX, data = datos_obligatorios, ylim = c(0.8, 2))
+boxplot(STATURE ~ SEX, data = datos_usados, ylim = range(datos_usados$STATURE, na.rm = TRUE))
 
-boxplot(STATURE ~ RACE, data = datos_obligatorios, ylim = c(0.8, 2))
-text(1:length(levels(datos_obligatorios$RACE)), 2, paste("n =", table(datos_obligatorios$RACE)))
+boxplot(STATURE ~ RACE, data = datos_usados, ylim = range(datos_usados$STATURE, na.rm = TRUE))
+text(1:length(levels(datos_usados$RACE)), range(datos_usados$STATURE, na.rm = TRUE)[2] + 0.2, paste('n =', table(datos_usados$RACE)))
 ```
 
+En el gráfico de la izquierda podemos observar que la mayor parte de las personas, sin importar el sexo, tienen una altura que va entre 1.2 y 1.6 metros. No solo eso, si no que la mediana es practicamente igual, 1.4 metros.
+
+Por otro lado, en el gráfico de la derecha estudiamos la altura en relación a las razas que contiene el dataset. Es importante considerar lo que nos marcan los 'n =', nos indican la cantidad de personas que pertenecientes a aquellas categorías.
+
+Analicemos un las relaciones entre peso, estatura y edad con la ayuda de los siguientes gráficos.
 
 ```{r}
 normalizar = function(vec){
@@ -61,21 +96,335 @@ masomenos = function(x, y, tol) {
   return(y <= x + tol & y >= x - tol)
 }
 
-STATURE_norm = normalizar(datos_obligatorios[!is.na(datos_obligatorios$STATURE), "STATURE"])
-AGE_norm = normalizar(datos_obligatorios[datos_obligatorios$AGE, "AGE"])
+STATURE_norm = normalizar(datos_usados[!is.na(datos_usados$STATURE), 'STATURE'])
+AGE_norm = normalizar(datos_usados[datos_usados$AGE, 'AGE'])
 
-plot(WEIGHT ~ AGE, datos_obligatorios, col = rgb(STATURE_norm, 0, 1 - STATURE_norm), pch = 4, xlab = "AGE (y)", ylab = "WEIGHT (kg)")
-legend("topleft", legend = c("mas alto", "menos alto"), col = c("red", "blue"), pch = 4)
+plot(WEIGHT ~ AGE, datos_usados, col = rgb(STATURE_norm, 0, 1 - STATURE_norm), pch = 4, xlab = 'AGE (y)', ylab = 'WEIGHT (kg)')
+legend('topleft', legend = c('mas alto', 'menos alto'), col = c('red', 'blue'), pch = 4)
 
-plot(WEIGHT ~ STATURE, datos_obligatorios,
-     col = ifelse(masomenos(datos_obligatorios$AGE, median(datos_obligatorios$AGE), 0.5), "green", rgb(AGE_norm, 0, 1 - AGE_norm)),
-     pch = 4, xlab = "STATURE (m)", ylab = "WEIGHT (kg)")
-legend("topleft", legend = c("mas edad", "menos edad"), col = c("red", "blue"), pch = 4)
+plot(WEIGHT ~ STATURE, datos_usados,
+     col = ifelse(masomenos(datos_usados$AGE, median(datos_usados$AGE), 0.5), 'green', rgb(AGE_norm, 0, 1 - AGE_norm)),
+     pch = 4, xlab = 'STATURE (m)', ylab = 'WEIGHT (kg)')
+legend('topleft', legend = c('mas edad', 'menos edad'), col = c('red', 'blue'), pch = 4)
 ```
+
+En verde las medianas. Podríamos ver si se corresponde con la pubertad. Tener en cuenta que es EEUU.
 
 esto para mostrar funciones de R base piolas
 
 ```{r}
-coplot(STATURE ~ AGE | RACE + SEX, datos_obligatorios, rows = 1)
+coplot(STATURE ~ AGE | RACE + SEX, datos_usados, rows = 1)
 ```
 
+Veamos los gráficos anteriores en función del sexo. 
+
+```{r}
+col_sex <- c('green', 'magenta')
+names(col_sex) <- levels(datos_usados$SEX)
+
+plot(WEIGHT ~ AGE, datos_usados, col = col_sex[datos_usados$SEX], pch = 4, xlab = 'AGE (y)', ylab = 'WEIGHT (kg)')
+legend('topleft', legend = levels(datos_usados$SEX), col = col_sex, pch = 4)
+```
+
+En el caso del peso, se puede observar que el peso crece en función de la edad de manera similar en ambos sexos hasta llegar a los 15 aproximadamente. A partir de allí, se nota un comportamiento distinto entre ambos sexos, el peso de los hombres creciendo más rápidamente que el de las mujeres.
+
+```{r}
+plot(WEIGHT ~ STATURE, datos_usados,
+     col = col_sex[datos_usados$SEX],
+     pch = 4, xlab = 'STATURE (m)', ylab = 'WEIGHT (kg)', log='y')
+legend('topleft', legend = levels(datos_usados$SEX), col = col_sex, pch = 4)
+```
+El comportamiento de la altura según la edad es similar para ambos sexos, sin embargo a partir del 1.6 aproximadamente se 'estancan' los datos de mujeres, mientras que los hombres continúan en aumento.
+
+Notemos que el eje y esta en escala logarítmica, por lo tanto si quisieramos plantear un modelo, no podría ser uno lineal.
+
+Armemos modelos utilizando las variables de peso, estatura y sexo.
+
+Comecemos armando un modelo que prediga el peso en función del sexo y la edad.
+
+```{r}
+modelo_edadf <- lm(WEIGHT~AGE, data=datos_usados[datos_usados$SEX=='femenino', ])
+modelo_edadf
+```
+
+```{r}
+modelo_edadm <- lm(WEIGHT~AGE, data=datos_usados[datos_usados$SEX=='masculino', ])
+modelo_edadm
+```
+
+Notemos que los coeficientes cambian dependendiendo del sexo con el cual estemos trabajando. Según el modelo, los niños tienen `r round(modelo_edadm$coefficients[2] - modelo_edadf$coefficients[2], 2)` más peso por año que las niñas.
+
+
+```{r}
+modelo_edadf2 <- lm(WEIGHT~poly(AGE, 2), data=datos_usados[datos_usados$SEX=='femenino', ])
+modelo_edadf2
+```
+
+```{r}
+modelo_edadm2 <- lm(WEIGHT~poly(AGE, 2), data=datos_usados[datos_usados$SEX=='masculino', ])
+modelo_edadm2
+```
+
+```{r}
+plot(WEIGHT ~ AGE, datos_usados, col = col_sex[datos_usados$SEX], pch = 4, xlab = 'AGE (y)', ylab = 'WEIGHT (kg)')
+legend('topleft', legend = levels(datos_usados$SEX), col = col_sex, pch = 4)
+abline(modelo_edadf, col = 'magenta4', lwd=2)
+abline(modelo_edadm, col = 'dark green', lwd=2)
+lines(1:20, predict(modelo_edadf2, newdata = data.frame('AGE' = 1:20)), col = 'magenta4', lwd=2, lty=2)
+lines(1:20, predict(modelo_edadm2, newdata = data.frame('AGE' = 1:20)), col = 'dark green', lwd=2, lty=2)
+
+```
+
+Comparamos modelos lineales y cuadráticos, en el caso de las mujeres no se ve diferencia mientras que en el de los hombres sí.
+
+```{r}
+# install.packages('rgl')
+library('rgl')
+plot3d(WEIGHT~AGE+STATURE, data=datos_usados, col = col_sex[datos_usados$SEX])
+rglwidget()
+```
+
+Gracias a este gráfico somos capaces de observar llega u n punto que en las mujeres se detiene el aumento de peso y estatura.
+
+Ahora armemos un modelo que prediga el peso en base la estatura y el sexo.
+
+#despues
+
+Hagamos esto mismo pero con las razas:
+
+```{r}
+col_raza <- rainbow(length(levels(datos_usados$RACE)))
+names(col_raza) <- levels(datos_usados$RACE)
+plot(STATURE~AGE, datos_usados, col=col_raza[datos_usados$RACE], pch=4)
+legend('topleft', legend = levels(datos_usados$RACE), col = col_raza, pch = 4)
+```
+
+Mala idea, hay mucha gente blanca, no se puede apreciar nada.
+
+Nos quedamos con los datos de las personas de categoría blanca y negra, ya que componen la mayor parte del dataset, del resto de las razas no tenemos suficiente información.
+
+```{r}
+datos_wb <- datos_usados[datos_usados$RACE=='black' | datos_usados$RACE=='white', ]
+```
+
+Armemos modelos
+
+```{r}
+modelo_alturab <- lm(STATURE~AGE, data = datos_wb[datos_wb$RACE=='black',])
+modelo_alturab
+```
+
+```{r}
+modelo_alturaw <- lm(STATURE~AGE, data = datos_wb[datos_wb$RACE=='white',])
+modelo_alturaw
+```
+
+```{r}
+plot(STATURE~AGE, datos_wb, col=col_raza[datos_wb$RACE])
+abline(modelo_alturab, col='blue')
+abline(modelo_alturaw, col='green')
+```
+
+No se puede apreciar una diferecia significativa. La poca diferencia puede estar sesgada por la cantidad de datos.
+
+#pasamos a otra cosa
+
+```{r}
+MAE = function(x, y) {
+  return(sum(abs(x - y)) / length(x))
+}
+
+PMAE = function(x, y) {
+  return(sum(abs(x - y)) / sum(x))
+}
+
+crossval = function(datos, formu, n_obs, fun_error, n_muestras = 1) {
+  errores = NULL
+  for (i in 1:n_muestras) {
+    samp_ev = sample(1:nrow(datos), n_obs)
+    modelo = lm(formu, data = datos[-samp_ev,])
+    error = fun_error(predict(modelo, datos[samp_ev,]), datos[samp_ev, toString(formu[[2]])])
+    errores = c(errores, error)
+  }
+  return(list(errores = errores, promedio = mean(errores), varianza = var(errores), formula = formu, modelo = lm(formu, data = datos)))
+}
+```
+
+
+```{r}
+comb_lineal <- function(datos, independientes, dependiente, tamanio=length(independientes)) {
+  errores = NULL
+  for (m in 1:tamanio) {
+    validos = which(apply(datos[c(dependiente, independientes)], 1, function (x) !any(is.na(x))))
+    combinaciones = combn(independientes, m)
+    for (i in 1:ncol(combinaciones)) {
+      val = crossval(datos[validos,], as.formula(paste(dependiente, ' ~ ', paste(combinaciones[,i], collapse = ' + '))), 20, PMAE, 10)
+      errores = rbind(errores, data.frame(combinacion = paste(combinaciones[,i], collapse = ' + '),
+                                    err_pred = val$promedio,
+                                    err_ajus = PMAE(datos[validos, dependiente], predict(val$modelo)),
+                                    varianza = val$varianza,
+                                    num_variables = length(combinaciones[,i]) ))
+    }
+  }
+  return(errores)
+}
+```
+
+```{r}
+errores_edad <- comb_lineal(datos_usados, escogidos, 'AGE')
+
+errores_edad$combinacion = as.factor(errores_edad$combinacion)
+par(mar = c(5,0,0,0) + 5)
+
+plot.default(errores_edad$combinacion, errores_edad$err_pred, axes = FALSE, ylim = c(0, 0.5), col = 'green', xlab = '', ylab = 'PMAE', main = 'Errores por formula (linear)')
+axis(side = 1, at = 1:length(errores_edad$combinacion), labels = errores_edad$combinacion, las = 2, cex.axis = 0.5)
+axis(side=2, at=seq(0, 0.5, 0.1), labels = seq(0, 0.5, 0.1), cex.axis = 1)
+points(errores_edad$combinacion, errores_edad$err_ajus, col = 'blue')
+legend('topright', c('prediccion', 'ajuste'), col = c('green', 'blue'), pch = 1)
+```
+
+# Tema central, talle de zapato
+
+Nos vamos a guiar por los taller determinados por [adidas](https://www.adidas.com.ar/cual_es_mi_talle_adidas.html)
+
+```{r}
+boxplot(datos_usados[, 'FOOT.LENGTH'], main='Medida de pie')
+quantile(datos_usados[, 'FOOT.LENGTH'], na.rm = TRUE)
+```
+
+Agregemos una nueva columna donde se nos indique el talle de la persona.
+
+(Usamos formula de Guido)
+
+```{r}
+talle <- function(longitud) {
+  return(ceiling((longitud + 2*0.667) / 0.667 /0.5) * 0.5)
+}
+
+datos_usados$TALLE <- talle(datos_usados$FOOT.LENGTH)
+datos$TALLE <- talle(datos$FOOT.LENGTH / 10)
+head(datos_usados)
+```
+
+```{r}
+boxplot(datos_usados[, 'TALLE'], main='Talle')
+table(datos_usados[, 'TALLE'])
+```
+
+Veamos opciones de modelos
+
+```{r}
+escogidos_talle <- c('AGE', 'WEIGHT', 'STATURE', 'SHOULDER.ELBOW.LENGTH', 'ELBOW.HAND.LENGTH', 'RACE', 'SEX')
+
+errores_talle <- comb_lineal(datos_usados, escogidos_talle, 'TALLE')
+
+errores_talle$combinacion = as.factor(errores_talle$combinacion)
+par(mar = c(5,0,0,0) + 5)
+
+plot.default(errores_talle$combinacion, errores_talle$err_pred, axes = FALSE, ylim = c(0, 0.5), col = 'green', xlab = '', ylab = 'PMAE', main = 'Errores por formula (linear)')
+axis(side = 1, at = 1:length(errores_talle$combinacion), labels = errores_talle$combinacion, las = 2, cex.axis = 0.5)
+axis(side=2, at=seq(0, 0.5, 0.1), labels = seq(0, 0.5, 0.1), cex.axis = 1)
+points(errores_talle$combinacion, errores_talle$err_ajus, col = 'blue')
+legend('topright', c('prediccion', 'ajuste'), col = c('green', 'blue'), pch = 1)
+
+View(errores_talle)
+```
+
+Llama la atención que la medida que va desde el codo hasta la mano nos da una buena idea de el talle.
+
+WEIGHT + ELBOW.HAND.LENGTH es la mejor pero es muy raro, ya que el peso es malisima sola. Puede ser por un tema de que nos dan información muy distinta.
+
+Las peores son peso, edad, raza y sexo, junto con sus posibles combinaciones.
+
+Pareciera que la mejor variable a atener en cuenta es la de elbow.hand.length
+
+
+# Estudiemos algunos de los modelos.
+
+```{r}
+errores_talle <- errores_talle[order(errores_talle$err_pred), ]
+col_num_var <- rainbow(max(errores_talle$num_variables))
+plot(errores_talle$err_pred, col=col_num_var[errores_talle$num_variables])
+legend('topleft', legend = 1:7, col = col_num_var, pch=15)
+```
+
+3 categorías, unos que no predicen nada, otros van mas o menos bien y los mejores (la diferencia de pmae casi es nula).
+
+```{r}
+datos[datos==0] <- NA
+cant_NA <- apply(datos, 2, function(x) sum(is.na(x)))
+cant_NA
+```
+
+Vamos a quedarnos solo con las columnas que tengan menos del 20% de NA's.
+
+```{r}
+menos_20 <- names(cant_NA[cant_NA<(3900*20/100)])
+menos_20
+```
+
+Armamos un vector con los nombres de aquellas columnas que usaremos para predecir el talle de las personas.
+
+```{r}
+menos_20 <- menos_20[!menos_20 %in% c('PERSON..', 'AGE.IN.YEARS', 'LOCATION', 'MEASUREMENT.DATE', 'MEASUREMENT.SET.TP', 'MEASURER.NUMBER', 'COMPUTER.NUMBER', 'TWIN', 'BIRTH.ORDER', 'MOTHERS.OCCUPATION', 'FATHERS.OCCUPATION', 'MOTHERS.EDUCATION', 'FATHERS.EDUCATION', 'YEARS.IN.COMMUNITY', 'TALLE', 'FOOT.LENGTH', 'FOOT.BREADTH')]
+datos_talle <- datos[, c(menos_20, 'TALLE')]
+head(datos_talle)
+```
+
+volvamos a armar las pruebas de modelos
+
+```{r}
+errores_talle20 <- comb_lineal(datos_talle, menos_20, 'TALLE', 5)
+
+errores_talle20$combinacion = as.factor(errores_talle20$combinacion)
+par(mar = c(5,0,0,0) + 5)
+
+plot.default(errores_talle20$combinacion, errores_talle20$err_pred, axes = FALSE, ylim = c(0, 0.5), col = 'green', xlab = '', ylab = 'PMAE', main = 'Errores por formula (linear)')
+axis(side = 1, at = 1:length(errores_talle20$combinacion), labels = errores_talle20$combinacion, las = 2, cex.axis = 0.5)
+axis(side=2, at=seq(0, 0.5, 0.1), labels = seq(0, 0.5, 0.1), cex.axis = 1)
+points(errores_talle20$combinacion, errores_talle20$err_ajus, col = 'blue')
+legend('topright', c('prediccion', 'ajuste'), col = c('green', 'blue'), pch = 1)
+```
+Repetimos el tratamiento de los modelos que usamos anteriormente con la seleccion nueva de variables.
+
+```{r}
+errores_talle20 <- errores_talle20[order(errores_talle20$err_pred), ]
+col_num_var <- rainbow(max(errores_talle20$num_variables))
+stripchart(errores_talle20$err_pred, col=col_num_var[errores_talle20$num_variables], method = "stack")
+# legend('topleft', legend = 1:7, col = col_num_var, pch=15)
+```
+
+
+```{r}
+plot3d(TALLE~ELBOW.HAND.LENGTH+AGE, datos_usados, col= col_sex[datos_usados$SEX])
+#legend('topleft', legend = levels(datos_usados$SEX), col = col_sex, pch = 4)
+rglwidget()
+```
+
+Super lineal :O
+
+Además, podemos observar cómo hay un "corte" para las mujeres (teniendo la misma edad, las mujeres llega un punto en el que dejan de crecer)
+
+Con la edad crece el talle.
+
+Estudiemos más a fondo el modelo que predice el talle en función del peso.
+
+```{r}
+modelo_w <- lm(TALLE~WEIGHT, datos_usados)
+plot(TALLE~WEIGHT, datos_usados, log='x')
+abline(modelo_w, col='red', lwd=2)
+```
+
+Se puede apreciar cierta relación entre las variables peso y talle. Observen que al cambiar la escala del eje x, en vez de una curva exponencial, se observa una recta.
+
+Mejoraría al plantear un modelo exponencial.
+
+Estudiemos el de edad y estatura
+
+```{r}
+modelo_as <- lm(TALLE~AGE+STATURE, datos_usados)
+plot3d(TALLE~AGE+STATURE, datos_usados, col= col_sex[datos_usados$SEX])
+#planes3d(modelo_as)
+```
+
+Volvemos a observar el "corte"
