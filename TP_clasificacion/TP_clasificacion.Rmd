@@ -1,0 +1,150 @@
+---
+title: "Clasificación - ejercicios"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+1. Cargar los paquetes necesarios.
+
+```{r}
+library(viridis) # opcional para tener los colores
+library(ggplot2) # para tener el alpha para regular opacidad
+library(class) # para el clasificador knn
+library(caret) # para la confusionMatrix
+library(rpart) # para usar árboles de decisión
+library(rpart.plot) # para mostrar árboles de decisión
+
+set.seed(10)
+```
+
+
+2. Cargar el dataset de árboles.
+
+```{r}
+data_arboles <- read.csv('arboles.csv') # ajustar el path si hace falta
+```
+
+3. Realizar un análisis exploratorio.
+
+```{r}
+head(data_arboles)
+```
+Hay cuatro variables, todas medidas enteras excepto nombre_com que es un factor de `r levels(data_arboles$nombre_com)` niveles.
+```{r}
+boxplot(diametro ~ nombre_com, data_arboles, outline = FALSE)
+text(1:length(levels(data_arboles$nombre_com)), 125, paste('n = ', table(data_arboles$nombre_com)))
+```
+La cantidad de observaciones de cada clase es bastante buena, teniendo la categoria menos frecuente `r min(table(data_arboles$nombre_com))` instancias.
+
+```{r}
+col_com <- rainbow(length(levels(data_arboles$nombre_com)))
+names(col_com) <- levels(data_arboles$nombre_com)
+
+plot(altura_tot ~ diametro, data_arboles, col = col_com[data_arboles$nombre_com])
+legend('topright', legend = names(col_com), col = col_com, pch = 1)
+```
+Hay una particion bastante bien definida en el plano altura_tot ~ diametro.
+
+4. Hacer un train-test split y hacer una clasificación con knn. Probar con distintos valores de k.
+
+_Código de ayuda (ver también el de la clase)_
+```{r}
+exactitud <- function(predicha, referencia) {
+  return(confusionMatrix(predicha, referencia)$overall[[1]])
+}
+
+exactitud_k <- function(data, predictoras, clasificadora, k = 1, Ptest = 0.2) {
+  test <- sample(1:nrow(data), Ptest*nrow(data))
+  class_train <- knn(data[-test, predictoras], data[-test, predictoras], data[-test, clasificadora], k = k)
+  class_test <- knn(data[-test, predictoras], data[test, predictoras], data[-test, clasificadora], k = k)
+  return(list(train = exactitud(class_train, data[-test, clasificadora]),
+              test = exactitud(class_test, data[test, clasificadora])))
+}
+```
+
+Implementada la funcion que evalua errores de train y test, ploteo los valores para cada valor de k
+
+```{r}
+predictoras <- c('altura_tot', 'diametro', 'inclinacio')
+clasificadora <- 'nombre_com'
+
+errores_k <- NULL
+for (k in 1:20) {
+  errores_k <- rbind(errores_k, data.frame(exactitud_k(data_arboles, predictoras, clasificadora, k)))
+}
+```
+
+4. Cross-validation: ajustar el modelo para cada valor de k dentro de un rango, y graficar la exactitud en función del k. Considerar hacer repeticiones en cada caso para filtrar la variabilidad.
+
+```{r}
+plot(errores_k$train, col = "blue", ylim = c(0.6,1), xlab = "K")
+points(errores_k$test, col = "red")
+```
+
+5. Reescalar los atributos para que tomen valores entre 0 y 1 y repetir. ¿Mejora la clasificación?
+
+```{r}
+normalizar = function(vec){
+  return((vec - min(vec)) / (max(vec) - min(vec)))
+}
+
+data_arboles_norm = data_arboles
+for (col in predictoras) {
+  data_arboles_norm[col] = normalizar(data_arboles[col])
+}
+
+errores_knorm = NULL
+for (k in 1:20) {
+  errores_knorm <- rbind(errores_knorm, data.frame(exactitud_k(data_arboles_norm, predictoras, clasificadora, k)))
+}
+```
+
+Comparo lado a lado los errores de train y test para datos normalizados y naturales
+
+```{r}
+par(mfrow = c(1,2))
+
+plot(errores_k$train, col = "blue", ylim = c(0.6,1), xlab = "K", main = "naturales", ylab = 'exactitud')
+points(errores_k$test, col = "red")
+
+plot(errores_knorm$train, col = "blue", ylim = c(0.6,1), xlab = "K", main = "normalizados", ylab = 'exactitud')
+points(errores_knorm$test, col = "red")
+```
+Los errores son, en terminos practicos, iguales.
+
+6. Utilizar ahora árboles de decisión para la clasificación. En este caso no es necesario usar los datos reescalados. Explorar el parámetro maxdepth y ver los árboles generados.
+
+```{r}
+predict(arbol, type = "class")
+exactitud_d <- function(data, predictoras, clasificadora, d = 1, Ptest = 0.2) {
+  test <- sample(1:nrow(data), Ptest*nrow(data))
+  arbol <- rpart(formula(paste(clasificadora, ' ~ ', paste(predictoras, collapse = ' + '))), data, subset = -test, maxdepth = d)
+  class_train <- predict(arbol, type = "class")
+  class_test <- predict(arbol, newdata = data[test,], type = "class")
+  return(list(train = exactitud(class_train, data[-test, clasificadora]),
+              test = exactitud(class_test, data[test, clasificadora])))
+}
+
+errores_d <- NULL
+errores_dnorm = NULL
+for (depth in 1:10) {
+  errores_d <- rbind(errores_d, data.frame(exactitud_d(data_arboles, predictoras, clasificadora, depth)))
+  errores_dnorm <- rbind(errores_dnorm, data.frame(exactitud_d(data_arboles_norm, predictoras, clasificadora, depth)))
+}
+```
+
+Repito el tratamiento grafico que use para KNN con los arboles de distinta profundidad.
+
+Ahora comparo lado a lado.
+
+```{r}
+par(mfrow = c(1,2))
+
+plot(errores_d$train, col = "blue", ylim = c(0.6,1), xlab = "D", main = "naturales", ylab = 'exactitud')
+points(errores_d$test, col = "red")
+
+plot(errores_dnorm$train, col = "blue", ylim = c(0.6,1), xlab = "D", main = "normalizados", ylab = 'exactitud')
+points(errores_dnorm$test, col = "red")
+```
